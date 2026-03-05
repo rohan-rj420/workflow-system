@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -49,6 +50,15 @@ public class Step {
     @Column(nullable = false)
     private int version;
 
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt;
+
+    @Column(name = "started_at")
+    private Instant startedAt;
+
+    @Column(name = "completed_at")
+    private Instant completedAt;
+
     public Step(UUID id, UUID workflowId, int stepOrder, String url) {
         this.id = id;
         this.workflowId = workflowId;
@@ -56,18 +66,22 @@ public class Step {
         this.externalUrl = url;
         this.status = StepStatus.PENDING;
         this.retryCount = 0;
+        this.createdAt = Instant.now();
     }
 
     public void markRunning() {
         this.status = StepStatus.RUNNING;
+        this.startedAt = Instant.now();
     }
 
     public void markSuccess() {
         this.status = StepStatus.SUCCESS;
+        this.completedAt = Instant.now();
     }
 
     public void markFailed(String error) {
         this.status = StepStatus.FAILED;
+        this.completedAt= Instant.now();
         this.lastError = error;
     }
 }

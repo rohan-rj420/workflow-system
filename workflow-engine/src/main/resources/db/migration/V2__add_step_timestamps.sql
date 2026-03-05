@@ -1,0 +1,10 @@
+-- Add lifecycle timestamps to steps table
+
+ALTER TABLE steps
+ADD COLUMN created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now();
+
+ALTER TABLE steps
+ADD COLUMN started_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE steps
+ADD COLUMN completed_at TIMESTAMP WITH TIME ZONE;

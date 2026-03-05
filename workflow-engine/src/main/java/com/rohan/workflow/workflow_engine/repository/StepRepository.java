@@ -14,4 +14,5 @@ public interface StepRepository extends JpaRepository<Step, UUID> {
 
     List<Step> findByWorkflowIdOrderByStepOrderAsc(UUID workflowId);
 
+    long countByStatus(StepStatus status);
 }

@@ -295,6 +295,13 @@ PENDING  ≈ 23000
 RUNNING  ≈ 1  
 FAILED   ≈ 10  
 
+
+During the experiment, the number of RUNNING steps rarely exceeded one,
+even with multiple workers. This indicates contention during task claiming,
+where multiple workers attempt to acquire the same pending step and only
+one succeeds. This inefficiency motivates the introduction of atomic task
+leasing in V2 using SELECT FOR UPDATE SKIP LOCKED.
+
 ### Observation
 
 The queue grows continuously because:
@@ -303,6 +310,20 @@ arrival rate > processing rate
 
 This leads to unbounded queue growth and large execution delays.
 
+Also,
+
+External step latency: ~200ms
+
+Theoretical max throughput per worker:
+
+1 / 0.2s ≈ 5 steps/sec
+
+Measured throughput:
+
+~2.8 steps/sec
+
+The difference is explained by database operations,
+HTTP overhead, and polling delays.
 ---
 
 # Latency Analysis
