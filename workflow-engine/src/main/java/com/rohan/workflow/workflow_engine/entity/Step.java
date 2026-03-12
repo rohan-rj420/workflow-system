@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -59,6 +60,13 @@ public class Step {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    @Column(name = "claimed_by")
+    private String claimedBy;
+
+    @Column(name = "lease_expires_at")
+    private Instant leaseExpiresAt;
+
+
     public Step(UUID id, UUID workflowId, int stepOrder, String url) {
         this.id = id;
         this.workflowId = workflowId;
@@ -67,11 +75,6 @@ public class Step {
         this.status = StepStatus.PENDING;
         this.retryCount = 0;
         this.createdAt = Instant.now();
-    }
-
-    public void markRunning() {
-        this.status = StepStatus.RUNNING;
-        this.startedAt = Instant.now();
     }
 
     public void markSuccess() {
@@ -83,5 +86,19 @@ public class Step {
         this.status = StepStatus.FAILED;
         this.completedAt= Instant.now();
         this.lastError = error;
+    }
+
+    public void claim(String workerId, Duration leaseDuration) {
+        this.status = StepStatus.RUNNING;
+        this.claimedBy = workerId;
+        if (this.startedAt == null) {
+            this.startedAt = Instant.now();
+        }
+        this.leaseExpiresAt = Instant.now().plus(leaseDuration);
+    }
+
+    public void releaseClaim() {
+        this.claimedBy = null;
+        this.leaseExpiresAt = null;
     }
 }

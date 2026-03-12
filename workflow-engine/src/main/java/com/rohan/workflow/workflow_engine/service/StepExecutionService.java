@@ -26,25 +26,11 @@ public class StepExecutionService {
     }
 
     @Transactional
-    public void markStepRunning(UUID stepId) {
-
-        Step step = stepRepository.findById(stepId).orElseThrow();
-        step.markRunning();
-
-        Workflow workflow =
-                workflowRepository.findById(step.getWorkflowId()).orElseThrow();
-
-        if (workflow.getStatus() == WorkflowStatus.CREATED) {
-            workflow.markRunning();
-        }
-    }
-
-    @Transactional
     public void markStepSuccess(UUID stepId) {
 
         Step step = stepRepository.findById(stepId).orElseThrow();
         step.markSuccess();
-
+        step.releaseClaim();
         List<Step> steps =
                 stepRepository.findByWorkflowIdOrderByStepOrderAsc(step.getWorkflowId());
 
@@ -65,7 +51,7 @@ public class StepExecutionService {
 
         Step step = stepRepository.findById(stepId).orElseThrow();
         step.markFailed(error);
-
+        step.releaseClaim();
         Workflow workflow =
                 workflowRepository.findById(step.getWorkflowId()).orElseThrow();
 

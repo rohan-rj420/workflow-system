@@ -5,10 +5,12 @@ import com.rohan.workflow.workflow_engine.entity.StepStatus;
 import com.rohan.workflow.workflow_engine.repository.StepRepository;
 import com.rohan.workflow.workflow_engine.service.StepClaimService;
 import com.rohan.workflow.workflow_engine.service.StepExecutionService;
+import jakarta.annotation.PostConstruct;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -23,7 +25,9 @@ public class WorkflowWorker {
     private final AtomicLong stepsExecuted = new AtomicLong();
     private final AtomicLong pollAttempts = new AtomicLong();
     private final AtomicLong idlePolls = new AtomicLong();
-    private final String workerId = "worker-" + UUID.randomUUID().toString().substring(0,8);;
+    private final String workerId = "worker-" + UUID.randomUUID().toString().substring(0,8);
+    private static final long MIN_DELAY = 100;
+    private static final long MAX_DELAY = 2000;
 
     public WorkflowWorker(
             StepRepository stepRepository,
@@ -35,25 +39,50 @@ public class WorkflowWorker {
         this.stepClaimService = stepClaimService;
     }
 
-    @Scheduled(fixedDelay = 100)
-    public void poll() {
-        pollAttempts.incrementAndGet();
-        Optional<Step> optionalStep = stepClaimService.claimNextStep(workerId);
-        if (optionalStep.isEmpty()) {
-            idlePolls.incrementAndGet();
-            return;
-        }
+    @PostConstruct
+    public void startWorker() {
+             new Thread(this::runWorkerLoop).start();
+    }
 
-        Step step = optionalStep.get();
-        System.out.println(
-                workerId + " claimed step " + step.getId()
-        );
-        executeStep(step);
+    private void runWorkerLoop() {
+
+        long currentDelay = MIN_DELAY;
+
+        while (true) {
+
+            pollAttempts.incrementAndGet();
+
+            Optional<Step> optionalStep =
+                    stepClaimService.findNextClaimableStep(workerId);
+
+            if (optionalStep.isEmpty()) {
+
+                idlePolls.incrementAndGet();
+
+                sleep(currentDelay);
+
+                currentDelay = Math.min(currentDelay + 100, MAX_DELAY);
+
+                continue;
+            }
+
+            Step step = optionalStep.get();
+
+            currentDelay = MIN_DELAY;
+
+            System.out.println(workerId + " claimed step " + step.getId());
+
+            executeStep(step);
+        }
+    }
+
+    private void sleep(long delay) {
+        try {
+            Thread.sleep(delay);
+        } catch (InterruptedException ignored) {}
     }
 
     private void executeStep(Step step) {
-
-        executionService.markStepRunning(step.getId());
         System.out.println(
                 workerId + " executing step " + step.getId()
         );
@@ -61,20 +90,21 @@ public class WorkflowWorker {
 
             restClient.post()
                     .uri(step.getExternalUrl())
+                    .header("Idempotency-Key", step.getId().toString())
                     .retrieve()
                     .toBodilessEntity();
 
             executionService.markStepSuccess(step.getId());
-            System.out.println(
-                    workerId + " completed step " + step.getId()
-            );
+
             stepsExecuted.incrementAndGet();
 
         } catch (Exception ex) {
 
             executionService.markStepFailed(step.getId(), ex.getMessage());
         }
-        step.releaseClaim();
+        System.out.println(
+                workerId + " completed step " + step.getId()
+        );
     }
     @Scheduled(fixedRate = 5000)
     public void logMetrics() {
@@ -87,7 +117,7 @@ public class WorkflowWorker {
         double utilization = polls == 0 ? 0 : ((double) executed / polls) * 100;
 
         long queueDepth =
-                stepRepository.countByStatus(StepStatus.PENDING);
+                stepRepository.countByStatusAndLeaseExpiresAtBefore(StepStatus.PENDING, Instant.now());
 
         System.out.println(
                 "\n===== WORKER METRICS =====" +
