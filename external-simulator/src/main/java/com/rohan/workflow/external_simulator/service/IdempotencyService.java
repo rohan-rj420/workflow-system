@@ -68,10 +68,11 @@ public class IdempotencyService {
             );
 
             if (reclaimed) {
+                System.out.println(workerId +" reclaimed lease for key: "+ key);
                 return executeAndComplete(key, action);
             }
         }
-
+        System.out.println(workerId +" failed to reclaim lease for key: "+ key);
         return IdempotencyResult.inProgress();
     }
 
@@ -124,6 +125,7 @@ public class IdempotencyService {
     @Transactional
     public void completeExecution(String key, String body, int statusCode) {
 
+        System.out.println(workerId +" executing idempotent action for key: "+ key);
         IdempotencyKey entity =
                 repository.findById(key).orElseThrow();
 
