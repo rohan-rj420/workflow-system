@@ -17,13 +17,25 @@ public class StepRepositoryImpl implements StepRepositoryCustom {
     @Override
     public Optional<Step> claimNextStep() {
         List<Step> steps = entityManager.createNativeQuery("""
-               SELECT *
-               FROM steps
-               WHERE (status = 'PENDING'
-               OR (status='RUNNING' AND lease_expires_at < now()))
-               ORDER BY created_at
-               FOR UPDATE SKIP LOCKED
-               LIMIT 1
+                        SELECT *
+                        FROM steps
+                        WHERE
+                        (
+                            status = 'PENDING'
+                        )
+                        OR
+                        (
+                            status = 'FAILED'
+                            AND next_retry_at <= now()
+                        )
+                        OR
+                        (
+                            status = 'RUNNING'
+                            AND lease_expires_at < now()
+                        )
+                        ORDER BY created_at
+                        FOR UPDATE SKIP LOCKED
+                        LIMIT 1
                 """, Step.class)
                 .getResultList();
 
