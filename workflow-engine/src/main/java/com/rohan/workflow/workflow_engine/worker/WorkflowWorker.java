@@ -97,14 +97,14 @@ public class WorkflowWorker {
             executionService.markStepSuccess(step.getId());
 
             stepsExecuted.incrementAndGet();
+            System.out.println(
+                    workerId + " completed step " + step.getId()
+            );
 
         } catch (Exception ex) {
 
             executionService.markStepFailed(step.getId(), ex.getMessage());
         }
-        System.out.println(
-                workerId + " completed step " + step.getId()
-        );
     }
     @Scheduled(fixedRate = 5000)
     public void logMetrics() {
@@ -117,7 +117,7 @@ public class WorkflowWorker {
         double utilization = polls == 0 ? 0 : ((double) executed / polls) * 100;
 
         long queueDepth =
-                stepRepository.countByStatusAndLeaseExpiresAtBefore(StepStatus.PENDING, Instant.now());
+                stepRepository.countRunnableSteps(Instant.now());
 
         System.out.println(
                 "\n===== WORKER METRICS =====" +

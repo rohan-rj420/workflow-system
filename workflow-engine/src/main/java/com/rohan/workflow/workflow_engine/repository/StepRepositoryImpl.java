@@ -3,8 +3,10 @@ package com.rohan.workflow.workflow_engine.repository;
 import com.rohan.workflow.workflow_engine.entity.Step;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,5 +46,22 @@ public class StepRepositoryImpl implements StepRepositoryCustom {
         }
 
         return Optional.of(steps.get(0));
+    }
+
+    @Override
+    public long countRunnableSteps(Instant now) {
+        Object result = entityManager.createNativeQuery("""
+            SELECT COUNT(*)
+            FROM steps
+            WHERE
+                status = 'PENDING'
+            OR
+                (status = 'FAILED' AND next_retry_at <= now())
+            OR
+                (status = 'RUNNING' AND lease_expires_at < now())
+            """)
+                .getSingleResult();
+
+        return ((Number) result).longValue();
     }
 }
