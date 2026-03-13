@@ -66,6 +66,11 @@ public class Step {
     @Column(name = "lease_expires_at")
     private Instant leaseExpiresAt;
 
+    @Column(name = "next_retry_at")
+    private Instant nextRetryAt;
+
+    @Column(name = "max_retries", nullable = false)
+    private int maxRetries;
 
     public Step(UUID id, UUID workflowId, int stepOrder, String url) {
         this.id = id;
@@ -100,5 +105,16 @@ public class Step {
     public void releaseClaim() {
         this.claimedBy = null;
         this.leaseExpiresAt = null;
+    }
+
+    public void scheduleRetry(Duration delay) {
+
+        this.retryCount++;
+        this.status = StepStatus.FAILED;
+        this.nextRetryAt = Instant.now().plus(delay);
+    }
+
+    public boolean canRetry() {
+        return retryCount < maxRetries;
     }
 }
