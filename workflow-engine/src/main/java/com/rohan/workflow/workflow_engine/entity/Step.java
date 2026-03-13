@@ -79,6 +79,7 @@ public class Step {
         this.externalUrl = url;
         this.status = StepStatus.PENDING;
         this.retryCount = 0;
+        this.maxRetries = 4;
         this.createdAt = Instant.now();
     }
 
