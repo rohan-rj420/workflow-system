@@ -4,5 +4,6 @@ public enum StepStatus {
     PENDING,
     RUNNING,
     SUCCESS,
-    FAILED
+    FAILED,
+    DEAD
 }

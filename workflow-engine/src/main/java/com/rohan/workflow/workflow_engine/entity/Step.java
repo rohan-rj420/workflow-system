@@ -87,12 +87,6 @@ public class Step {
         this.completedAt = Instant.now();
     }
 
-    public void markFailed(String error) {
-        this.status = StepStatus.FAILED;
-        this.completedAt= Instant.now();
-        this.lastError = error;
-    }
-
     public void claim(String workerId, Duration leaseDuration) {
         this.status = StepStatus.RUNNING;
         this.claimedBy = workerId;
@@ -107,14 +101,22 @@ public class Step {
         this.leaseExpiresAt = null;
     }
 
-    public void scheduleRetry(Duration delay) {
-
+    public void scheduleRetry(Duration delay, String error) {
         this.retryCount++;
         this.status = StepStatus.FAILED;
+        this.lastError = error;
         this.nextRetryAt = Instant.now().plus(delay);
+        releaseClaim();
     }
 
     public boolean canRetry() {
         return retryCount < maxRetries;
+    }
+
+    public void markDead(String error) {
+        this.status=StepStatus.DEAD;
+        this.lastError = error;
+        this.completedAt= Instant.now();
+        releaseClaim();
     }
 }
