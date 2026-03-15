@@ -1,6 +1,6 @@
-package com.rohan.workflow.workflow_engine.outbox.entity;
+package com.rohan.workflow.outbox_dispatcher.entity;
 
-import com.rohan.workflow.workflow_engine.outbox.enums.OutboxEventType;
+import com.rohan.workflow.outbox_dispatcher.enums.OutboxEventType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

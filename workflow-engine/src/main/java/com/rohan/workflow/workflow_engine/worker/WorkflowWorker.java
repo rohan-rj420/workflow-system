@@ -2,26 +2,32 @@ package com.rohan.workflow.workflow_engine.worker;
 
 import com.rohan.workflow.workflow_engine.entity.Step;
 import com.rohan.workflow.workflow_engine.entity.StepStatus;
+import com.rohan.workflow.workflow_engine.outbox.enums.OutboxEventType;
+import com.rohan.workflow.workflow_engine.outbox.payload.StepExecutionRequestedPayload;
+import com.rohan.workflow.workflow_engine.outbox.service.OutboxService;
 import com.rohan.workflow.workflow_engine.repository.StepRepository;
 import com.rohan.workflow.workflow_engine.service.StepClaimService;
 import com.rohan.workflow.workflow_engine.service.StepExecutionService;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 public class WorkflowWorker {
 
     private final StepRepository stepRepository;
-    private final StepExecutionService executionService;
-    private final RestClient restClient;
+    private final OutboxService  outboxService;
     private final StepClaimService stepClaimService;
+    private final Executor workerExecutor;
     private final AtomicLong stepsExecuted = new AtomicLong();
     private final AtomicLong pollAttempts = new AtomicLong();
     private final AtomicLong idlePolls = new AtomicLong();
@@ -32,16 +38,16 @@ public class WorkflowWorker {
     public WorkflowWorker(
             StepRepository stepRepository,
             StepExecutionService executionService,
-            RestClient restClient, StepClaimService stepClaimService) {
+            OutboxService outboxService, StepClaimService stepClaimService, @Qualifier("workerExecutor")Executor workerExecutor) {
         this.stepRepository = stepRepository;
-        this.executionService = executionService;
-        this.restClient = restClient;
+        this.outboxService = outboxService;
         this.stepClaimService = stepClaimService;
+        this.workerExecutor = workerExecutor;
     }
 
     @PostConstruct
     public void startWorker() {
-             new Thread(this::runWorkerLoop).start();
+             workerExecutor.execute(this::runWorkerLoop);
     }
 
     private void runWorkerLoop() {
@@ -84,26 +90,26 @@ public class WorkflowWorker {
 
     private void executeStep(Step step) {
         System.out.println(
-                workerId + " executing step " + step.getId()
+                workerId + " scheduling execution for step " + step.getId()
         );
         try {
-
-            restClient.post()
-                    .uri(step.getExternalUrl())
-                    .header("Idempotency-Key", step.getId().toString())
-                    .retrieve()
-                    .toBodilessEntity();
-
-            executionService.markStepSuccess(step.getId());
-
-            stepsExecuted.incrementAndGet();
-            System.out.println(
-                    workerId + " completed step " + step.getId()
+            StepExecutionRequestedPayload payload= new StepExecutionRequestedPayload(
+                    step.getId(),
+                    step.getWorkflowId(),
+                    step.getExternalUrl(),
+                    step.getId().toString()
             );
+
+            outboxService.publishEvent(OutboxEventType.STEP_EXECUTION_REQUESTED, payload);
 
         } catch (Exception ex) {
 
-            executionService.markStepFailed(step.getId(), ex.getMessage());
+            System.out.println(
+                    workerId + " failed to schedule execution for step "
+                            + step.getId() + " error: " + ex.getMessage()
+            );
+
+            ex.printStackTrace();
         }
     }
     @Scheduled(fixedRate = 5000)

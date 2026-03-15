@@ -10,11 +10,22 @@
         <module name="external-simulator" />
         <module name="workflow-engine" />
       </profile>
+      <profile name="Annotation profile for workflow-system" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
+        </processorPath>
+        <module name="outbox-dispatcher" />
+      </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="external-simulator" options="-parameters" />
+      <module name="outbox-dispatcher" options="-parameters" />
       <module name="workflow-engine" options="-parameters" />
     </option>
   </component>

@@ -1,4 +1,4 @@
-package com.rohan.workflow.workflow_engine.outbox.payload;
+package com.rohan.workflow.outbox_dispatcher.payload;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

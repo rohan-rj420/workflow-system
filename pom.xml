@@ -21,6 +21,7 @@
     <modules>
         <module>workflow-engine</module>
         <module>external-simulator</module>
+        <module>outbox-dispatcher</module>
     </modules>
 
     <!-- Centralized Properties -->

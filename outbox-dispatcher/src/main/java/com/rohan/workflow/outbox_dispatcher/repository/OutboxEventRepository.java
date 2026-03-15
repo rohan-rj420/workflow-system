@@ -1,6 +1,6 @@
-package com.rohan.workflow.workflow_engine.outbox.repository;
+package com.rohan.workflow.outbox_dispatcher.repository;
 
-import com.rohan.workflow.workflow_engine.outbox.entity.OutboxEvent;
+import com.rohan.workflow.outbox_dispatcher.entity.OutboxEvent;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.UUID;

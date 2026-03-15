@@ -1,4 +1,4 @@
-package com.rohan.workflow.workflow_engine.outbox.enums;
+package com.rohan.workflow.outbox_dispatcher.enums;
 
 public enum OutboxEventType {
 
