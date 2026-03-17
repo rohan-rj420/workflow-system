@@ -2,13 +2,16 @@ package com.rohan.workflow.workflow_engine.worker;
 
 import com.rohan.workflow.workflow_engine.entity.Step;
 import com.rohan.workflow.workflow_engine.entity.StepStatus;
+import com.rohan.workflow.workflow_engine.metrics.WorkflowMetrics;
 import com.rohan.workflow.workflow_engine.outbox.enums.OutboxEventType;
 import com.rohan.workflow.workflow_engine.outbox.payload.StepExecutionRequestedPayload;
 import com.rohan.workflow.workflow_engine.outbox.service.OutboxService;
 import com.rohan.workflow.workflow_engine.repository.StepRepository;
 import com.rohan.workflow.workflow_engine.service.StepClaimService;
 import com.rohan.workflow.workflow_engine.service.StepExecutionService;
+import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -21,6 +24,7 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
+@Slf4j
 @Component
 public class WorkflowWorker {
 
@@ -28,6 +32,7 @@ public class WorkflowWorker {
     private final OutboxService  outboxService;
     private final StepClaimService stepClaimService;
     private final Executor workerExecutor;
+    private final WorkflowMetrics workflowMetrics;
     private final AtomicLong stepsExecuted = new AtomicLong();
     private final AtomicLong pollAttempts = new AtomicLong();
     private final AtomicLong idlePolls = new AtomicLong();
@@ -35,14 +40,16 @@ public class WorkflowWorker {
     private static final long MIN_DELAY = 100;
     private static final long MAX_DELAY = 2000;
 
+
     public WorkflowWorker(
             StepRepository stepRepository,
             StepExecutionService executionService,
-            OutboxService outboxService, StepClaimService stepClaimService, @Qualifier("workerExecutor")Executor workerExecutor) {
+            OutboxService outboxService, StepClaimService stepClaimService, @Qualifier("workerExecutor")Executor workerExecutor, WorkflowMetrics workflowMetrics) {
         this.stepRepository = stepRepository;
         this.outboxService = outboxService;
         this.stepClaimService = stepClaimService;
         this.workerExecutor = workerExecutor;
+        this.workflowMetrics = workflowMetrics;
     }
 
     @PostConstruct
@@ -54,31 +61,40 @@ public class WorkflowWorker {
 
         long currentDelay = MIN_DELAY;
 
-        while (true) {
+        while(true) {
 
             pollAttempts.incrementAndGet();
 
             Optional<Step> optionalStep =
                     stepClaimService.findNextClaimableStep(workerId);
+            workflowMetrics.stepClaimed();
 
             if (optionalStep.isEmpty()) {
-
                 idlePolls.incrementAndGet();
-
                 sleep(currentDelay);
-
                 currentDelay = Math.min(currentDelay + 100, MAX_DELAY);
-
                 continue;
             }
 
             Step step = optionalStep.get();
-
             currentDelay = MIN_DELAY;
+            log.info("{} claimed step {}",workerId, step.getId());
 
-            System.out.println(workerId + " claimed step " + step.getId());
+            Timer.Sample sample = Timer.start();
+            try {
 
-            executeStep(step);
+                executeStep(step);
+
+                workflowMetrics.stepCompleted();
+
+            } catch (Exception e) {
+
+                workflowMetrics.stepFailed();
+
+            } finally {
+
+                sample.stop(workflowMetrics.getExecutionTimer());
+            }
         }
     }
 
@@ -89,9 +105,7 @@ public class WorkflowWorker {
     }
 
     private void executeStep(Step step) {
-        System.out.println(
-                workerId + " scheduling execution for step " + step.getId()
-        );
+        log.info("{} scheduling execution for step {}", workerId, step.getId());
         try {
             StepExecutionRequestedPayload payload= new StepExecutionRequestedPayload(
                     step.getId(),
@@ -101,15 +115,14 @@ public class WorkflowWorker {
             );
 
             outboxService.publishEvent(OutboxEventType.STEP_EXECUTION_REQUESTED, payload);
-
+            log.info("[STEP {} ] scheduling execution", step.getId());
         } catch (Exception ex) {
 
             System.out.println(
                     workerId + " failed to schedule execution for step "
                             + step.getId() + " error: " + ex.getMessage()
             );
-
-            ex.printStackTrace();
+            log.error("{} failed to schedule execution for step {} giving error: {}", workerId, step.getId(), ex.getMessage());
         }
     }
     @Scheduled(fixedRate = 5000)
@@ -125,14 +138,13 @@ public class WorkflowWorker {
         long queueDepth =
                 stepRepository.countRunnableSteps(Instant.now());
 
-        System.out.println(
-                "\n===== WORKER METRICS =====" +
-                        "\nThroughput (steps/sec): " + throughput +
-                        "\nPoll attempts: " + polls +
-                        "\nIdle polls: " + idle +
-                        "\nWorker utilization: " + utilization + "%" +
-                        "\nQueue depth: " + queueDepth +
-                        "\n==========================\n"
+        log.info(
+                "WORKER_METRICS throughput={} steps/sec, polls={}, idlePolls={}, utilization={}%, queueDepth={}",
+                throughput,
+                polls,
+                idle,
+                utilization,
+                queueDepth
         );
     }
 }

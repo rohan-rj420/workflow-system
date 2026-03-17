@@ -2,10 +2,12 @@ package com.rohan.workflow.external_simulator.controller;
 
 import com.rohan.workflow.external_simulator.dto.IdempotencyResult;
 import com.rohan.workflow.external_simulator.service.IdempotencyService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/execute")
 public class ExternalController {
@@ -26,7 +28,7 @@ public class ExternalController {
 
         IdempotencyResult result =
                 idempotencyService.handleRequest(key, () -> {
-                    System.out.println("Executing action for key: "+ key);
+                    log.info("Executing action for key: "+ key);
                     try {
 
                         if (delay != null) {

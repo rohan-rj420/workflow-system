@@ -5,6 +5,7 @@ import com.rohan.workflow.external_simulator.dto.IdempotencyResult;
 import com.rohan.workflow.external_simulator.entity.IdempotencyKey;
 import com.rohan.workflow.external_simulator.entity.IdempotencyStatus;
 import com.rohan.workflow.external_simulator.repository.IdempotencyKeyRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +14,7 @@ import java.time.Instant;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+@Slf4j
 @Service
 public class IdempotencyService {
 
@@ -68,11 +70,11 @@ public class IdempotencyService {
             );
 
             if (reclaimed) {
-                System.out.println(workerId +" reclaimed lease for key: "+ key);
+                log.info("{} Reclaimed lease for key {}",workerId, key);
                 return executeAndComplete(key, action);
             }
         }
-        System.out.println(workerId +" failed to reclaim lease for key: "+ key);
+        log.warn("{} failed to reclaim lease for key: {}",workerId, key);
         return IdempotencyResult.inProgress();
     }
 
@@ -125,7 +127,7 @@ public class IdempotencyService {
     @Transactional
     public void completeExecution(String key, String body, int statusCode) {
 
-        System.out.println(workerId +" executing idempotent action for key: "+ key);
+        log.info("{} executing idempotent action for key: {}",workerId, key);
         IdempotencyKey entity =
                 repository.findById(key).orElseThrow();
 

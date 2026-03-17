@@ -5,12 +5,14 @@ import com.rohan.workflow.workflow_engine.repository.DeadLetterStepRepository;
 import com.rohan.workflow.workflow_engine.repository.StepRepository;
 import com.rohan.workflow.workflow_engine.repository.WorkflowRepository;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class StepExecutionService {
 
@@ -54,7 +56,7 @@ public class StepExecutionService {
         if(step.canRetry()){
             Duration delay = calculateBackoff(step.getRetryCount());
             step.scheduleRetry(delay, error);
-            System.out.println("Retry scheduled for step " + step.getId() + " after " +delay.getSeconds()+ " seconds");
+            log.info("Retry scheduled for step {} after {} seconds", step.getId(), delay.getSeconds());
             return;
         }
         moveToDeadLetter(step,error);
@@ -71,6 +73,6 @@ public class StepExecutionService {
         stepRepository.delete(step);
         Workflow workflow = workflowRepository.findById(step.getWorkflowId()).orElseThrow();
         workflow.markFailed();
-        System.out.println("Step " + step.getId() + " moved to DLQ after retries exhausted");
+        log.info("Step {} moved to DLQ after retries exhausted", step.getId());
     }
 }

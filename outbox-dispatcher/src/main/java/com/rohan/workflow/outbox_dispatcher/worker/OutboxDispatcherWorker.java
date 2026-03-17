@@ -1,7 +1,9 @@
 package com.rohan.workflow.outbox_dispatcher.worker;
 
+import com.rohan.workflow.outbox_dispatcher.metrics.DispatcherMetrics;
 import com.rohan.workflow.outbox_dispatcher.service.EventDispatchService;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +14,9 @@ public class OutboxDispatcherWorker {
 
     private final EventDispatchService dispatchService;
     private final Executor dispatcherExecutor;
-    public OutboxDispatcherWorker(EventDispatchService dispatchService, @Qualifier("dispatcherExecutor")Executor dispatcherExecutor) {
+    private volatile boolean running = true;
+
+    public OutboxDispatcherWorker(EventDispatchService dispatchService, @Qualifier("dispatcherExecutor")Executor dispatcherExecutor, DispatcherMetrics dispatcherMetrics) {
         this.dispatchService = dispatchService;
         this.dispatcherExecutor = dispatcherExecutor;
     }
@@ -24,7 +28,7 @@ public class OutboxDispatcherWorker {
 
     private void runLoop() {
 
-        while (true) {
+        while (running) {
 
             try {
 
@@ -36,5 +40,10 @@ public class OutboxDispatcherWorker {
                 e.printStackTrace();
             }
         }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        running = false;
     }
 }
