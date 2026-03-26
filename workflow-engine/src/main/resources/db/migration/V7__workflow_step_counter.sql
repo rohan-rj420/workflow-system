@@ -1,0 +1,2 @@
+ALTER TABLE workflows ADD COLUMN total_steps INT NOT NULL DEFAULT 0;
+ALTER TABLE workflows ADD COLUMN completed_steps INT NOT NULL DEFAULT 0;

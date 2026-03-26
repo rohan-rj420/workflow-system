@@ -33,8 +33,8 @@ public class WorkflowService {
         validateRequest(request);
 
         UUID workflowId = UUID.randomUUID();
-
-        Workflow workflow = new Workflow(workflowId);
+        int totalSteps=request.getSteps().size();
+        Workflow workflow = new Workflow(workflowId, totalSteps);
         workflowRepository.save(workflow);
 
         List<StepRequest> stepRequests = request.getSteps();

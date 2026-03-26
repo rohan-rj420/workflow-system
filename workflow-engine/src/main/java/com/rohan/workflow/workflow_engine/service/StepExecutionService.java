@@ -32,33 +32,41 @@ public class StepExecutionService {
     public void markStepSuccess(UUID stepId) {
 
         Step step = stepRepository.findById(stepId).orElseThrow();
+
+        // idempotency safety
+        if (step.getStatus() == StepStatus.SUCCESS) {
+            return;
+        }
+
         step.markSuccess();
         step.releaseClaim();
-        List<Step> steps =
-                stepRepository.findByWorkflowIdOrderByStepOrderAsc(step.getWorkflowId());
 
-        boolean allSuccess =
-                steps.stream().allMatch(s -> s.getStatus() == StepStatus.SUCCESS);
+        Workflow workflow =
+                workflowRepository.findById(step.getWorkflowId()).orElseThrow();
 
-        if (allSuccess) {
+        workflow.markRunningIfNotStarted();
+        workflow.incrementCompletedSteps();
 
-            Workflow workflow =
-                    workflowRepository.findById(step.getWorkflowId()).orElseThrow();
-
-            workflow.markCompleted();
-        }
+        log.info("Workflow {} progress: {}/{}",
+                workflow.getId(),
+                workflow.getCompletedSteps(),
+                workflow.getTotalSteps());
     }
 
     @Transactional
     public void markStepFailed(UUID stepId, String error) {
 
         Step step = stepRepository.findById(stepId).orElseThrow();
+        Workflow workflow = workflowRepository.findById(step.getWorkflowId()).orElseThrow();
+        workflow.markRunningIfNotStarted();
+
         if(step.canRetry()){
             Duration delay = calculateBackoff(step.getRetryCount());
             step.scheduleRetry(delay, error);
             log.info("Retry scheduled for step {} after {} seconds", step.getId(), delay.getSeconds());
             return;
         }
+
         moveToDeadLetter(step,error);
     }
 
@@ -72,7 +80,9 @@ public class StepExecutionService {
         deadLetterStepRepository.save(deadLetterStep);
         stepRepository.delete(step);
         Workflow workflow = workflowRepository.findById(step.getWorkflowId()).orElseThrow();
-        workflow.markFailed();
+        if(workflow.getStatus()!=WorkflowStatus.FAILED){
+            workflow.markFailed();
+        }
         log.info("Step {} moved to DLQ after retries exhausted", step.getId());
     }
 }
