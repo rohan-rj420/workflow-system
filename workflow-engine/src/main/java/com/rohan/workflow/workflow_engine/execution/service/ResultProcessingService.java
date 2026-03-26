@@ -17,20 +17,17 @@ import java.util.Optional;
 public class ResultProcessingService {
 
     private final ExecutionResultRepositoryCustom resultRepository;
-    private final StepRepository stepRepository;
-    private final StepExecutionService stepExecutionService;
+    private final ResultProcessorService resultProcessorService;
 
     public ResultProcessingService(
             ExecutionResultRepositoryCustom resultRepository,
             StepRepository stepRepository,
-            StepExecutionService stepExecutionService) {
+            StepExecutionService stepExecutionService, ResultProcessorService resultProcessorService) {
 
         this.resultRepository = resultRepository;
-        this.stepRepository = stepRepository;
-        this.stepExecutionService = stepExecutionService;
+        this.resultProcessorService = resultProcessorService;
     }
 
-    @Transactional
     public void processBatch() throws InterruptedException {
 
         List<ExecutionResult> results =
@@ -42,47 +39,7 @@ public class ResultProcessingService {
         log.info("Processing {} results " , results.size());
 
         for (ExecutionResult result : results) {
-
-            log.info("[STEP {} ] processing execution result", result.getStepId());
-
-            Optional<Step> stepOpt =
-                    stepRepository.findById(result.getStepId());
-
-            // STEP ALREADY REMOVED (DLQ case)
-            if (stepOpt.isEmpty()) {
-
-                log.warn("[STEP {}] no longer exists -skipping result", result.getStepId());
-                result.markProcessed();
-                continue;
-            }
-
-            Step step = stepOpt.get();
-
-            // STEP ALREADY FINALIZED
-            if (step.getStatus() == StepStatus.SUCCESS ||
-                    step.getStatus() == StepStatus.FAILED) {
-
-                log.warn("[STEP {}] step already finalized — ignoring duplicate result", result.getStepId());
-                result.markProcessed();
-                continue;
-            }
-
-            // APPLY RESULT
-            if (result.isSuccess()) {
-
-                stepExecutionService.markStepSuccess(
-                        result.getStepId()
-                );
-
-            } else {
-
-                stepExecutionService.markStepFailed(
-                        result.getStepId(),
-                        result.getError()
-                );
-            }
-
-            result.markProcessed();
+            resultProcessorService.processSingleResult(result);
         }
     }
 }
