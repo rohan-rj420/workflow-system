@@ -31,11 +31,14 @@ public class ResultProcessingService {
     }
 
     @Transactional
-    public void processBatch() {
+    public void processBatch() throws InterruptedException {
 
         List<ExecutionResult> results =
                 resultRepository.claimNextBatch(20);
-
+        if(results.isEmpty()) {
+            Thread.sleep(100);
+            return;
+        }
         log.info("Processing {} results " , results.size());
 
         for (ExecutionResult result : results) {

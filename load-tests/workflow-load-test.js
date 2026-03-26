@@ -6,7 +6,7 @@ export const options = {
   scenarios: {
     steady_load: {
       executor: "constant-vus",
-      vus: 10,          // number of concurrent users
+      vus: 20,          // number of concurrent users
       duration: "2m",   // test duration
     },
   },

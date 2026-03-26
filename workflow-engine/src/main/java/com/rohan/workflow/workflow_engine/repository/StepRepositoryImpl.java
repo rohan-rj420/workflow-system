@@ -64,4 +64,21 @@ public class StepRepositoryImpl implements StepRepositoryCustom {
 
         return ((Number) result).longValue();
     }
+
+    @Override
+    public List<Step> claimNextBatch(int batchSize) {
+        return entityManager.createNativeQuery("""
+            SELECT *
+            FROM steps
+            WHERE
+                status = 'PENDING'
+                OR (status = 'FAILED' AND next_retry_at <= now())
+                OR (status = 'RUNNING' AND lease_expires_at < now())
+            ORDER BY created_at
+            FOR UPDATE SKIP LOCKED
+            LIMIT :batchSize
+        """, Step.class)
+                .setParameter("batchSize", batchSize)
+                .getResultList();
+    }
 }

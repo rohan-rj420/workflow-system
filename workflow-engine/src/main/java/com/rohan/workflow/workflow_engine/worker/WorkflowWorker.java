@@ -19,9 +19,12 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
@@ -39,7 +42,7 @@ public class WorkflowWorker {
     private final String workerId = "worker-" + UUID.randomUUID().toString().substring(0,8);
     private static final long MIN_DELAY = 100;
     private static final long MAX_DELAY = 2000;
-
+    private final BlockingQueue<Step> stepQueue = new LinkedBlockingQueue<>(1000);
 
     public WorkflowWorker(
             StepRepository stepRepository,
@@ -52,51 +55,87 @@ public class WorkflowWorker {
         this.workflowMetrics = workflowMetrics;
     }
 
-    @PostConstruct
-    public void startWorker() {
-             workerExecutor.execute(this::runWorkerLoop);
-    }
+//    @PostConstruct
+//    public void startWorker() {
+//             workerExecutor.execute(this::runWorkerLoop);
+//    }
+      @PostConstruct
+      public void startWorker() {
 
-    private void runWorkerLoop() {
+              // 1 claimer thread
+              workerExecutor.execute(this::runClaimerLoop);
 
-        long currentDelay = MIN_DELAY;
+              // multiple executor threads
+              for (int i = 0; i < 8; i++) {
+                    workerExecutor.execute(this::runExecutorLoop);
+              }
+      }
 
-        while(true) {
+    private void runClaimerLoop() {
+        while (true) {
 
-            pollAttempts.incrementAndGet();
+            List<Step> steps = stepClaimService.claimBatch(workerId, 50);
 
-            Optional<Step> optionalStep =
-                    stepClaimService.findNextClaimableStep(workerId);
-            workflowMetrics.stepClaimed();
-
-            if (optionalStep.isEmpty()) {
-                idlePolls.incrementAndGet();
-                sleep(currentDelay);
-                currentDelay = Math.min(currentDelay + 100, MAX_DELAY);
+            if (steps.isEmpty()) {
+                sleep(100);
                 continue;
             }
 
-            Step step = optionalStep.get();
-            currentDelay = MIN_DELAY;
-            log.info("{} claimed step {}",workerId, step.getId());
-
-            Timer.Sample sample = Timer.start();
-            try {
-
-                executeStep(step);
-
-                workflowMetrics.stepCompleted();
-
-            } catch (Exception e) {
-
-                workflowMetrics.stepFailed();
-
-            } finally {
-
-                sample.stop(workflowMetrics.getExecutionTimer());
+            for (Step step : steps) {
+                stepQueue.offer(step);
             }
         }
     }
+    private void runExecutorLoop() {
+        while (true) {
+            try {
+                Step step = stepQueue.take();
+
+                Timer.Sample sample = Timer.start();
+
+                try {
+                    executeStep(step);
+                    workflowMetrics.stepCompleted();
+                } catch (Exception e) {
+                    workflowMetrics.stepFailed();
+                } finally {
+                    sample.stop(workflowMetrics.getExecutionTimer());
+                }
+
+            } catch (InterruptedException ignored) {}
+        }
+    }
+//    private void runWorkerLoop() {
+//
+//        long currentDelay = MIN_DELAY;
+//
+//        while (true) {
+//            pollAttempts.incrementAndGet();
+//            List<Step> steps = stepClaimService.claimBatch(workerId, 50);
+//
+//            if (steps.isEmpty()) {
+//                idlePolls.incrementAndGet();
+//                sleep(currentDelay);
+//                currentDelay = Math.min(currentDelay + 100, MAX_DELAY);
+//                continue;
+//            }
+//            currentDelay = MIN_DELAY;
+//
+//            log.info("{} claimed {} steps", workerId, steps.size());
+//            for (Step step : steps) {
+//                workflowMetrics.stepClaimed();
+//                Timer.Sample sample = Timer.start();
+//                try {
+//                    executeStep(step);
+//                    workflowMetrics.stepCompleted();
+//                } catch (Exception e) {
+//                    workflowMetrics.stepFailed();
+//                } finally {
+//                    sample.stop(workflowMetrics.getExecutionTimer());
+//                }
+//            }
+//        }
+//    }
 
     private void sleep(long delay) {
         try {
@@ -127,7 +166,7 @@ public class WorkflowWorker {
     }
     @Scheduled(fixedRate = 5000)
     public void logMetrics() {
-
+        System.out.println("RUNNING");
         long polls = pollAttempts.getAndSet(0);
         long executed = stepsExecuted.getAndSet(0);
         long idle = idlePolls.getAndSet(0);

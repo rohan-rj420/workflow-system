@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -32,5 +33,17 @@ public class StepClaimService {
 
         step.claim(workerId, LEASE_DURATION);
         return Optional.of(step);
+    }
+
+    @Transactional
+    public List<Step> claimBatch(String workerId, int batchSize)
+    {
+        List<Step> steps = stepRepository.claimNextBatch(batchSize);
+
+        for(Step step : steps)
+        {
+            step.claim(workerId,LEASE_DURATION);
+        }
+        return steps;
     }
 }
