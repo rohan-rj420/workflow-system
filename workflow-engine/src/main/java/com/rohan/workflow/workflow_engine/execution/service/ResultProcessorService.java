@@ -51,15 +51,10 @@ public class ResultProcessorService {
 
         // APPLY RESULT
         if (result.isSuccess()) {
-
-            stepExecutionService.markStepSuccess(
-                    result.getStepId()
-            );
-
+            stepExecutionService.markStepSuccess(step);
         } else {
-
             stepExecutionService.markStepFailed(
-                    result.getStepId(),
+                    step,
                     result.getError()
             );
         }

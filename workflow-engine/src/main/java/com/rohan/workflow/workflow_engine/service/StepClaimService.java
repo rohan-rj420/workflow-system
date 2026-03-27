@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,12 +39,27 @@ public class StepClaimService {
     @Transactional
     public List<Step> claimBatch(String workerId, int batchSize)
     {
-        List<Step> steps = stepRepository.claimNextBatch(batchSize);
+        int remaining = batchSize;
 
-        for(Step step : steps)
+        List<Step> pending = stepRepository.claimPending(remaining);
+        List<Step> result = new ArrayList<>(pending);
+        remaining-=pending.size();
+
+        if(remaining>0){
+            List<Step> retryable = stepRepository.claimRetryable(remaining);
+            result.addAll(retryable);
+            remaining-=retryable.size();
+        }
+
+        if(remaining>0){
+            List<Step> expired = stepRepository.claimExpired(remaining);
+            result.addAll(expired);
+        }
+
+        for(Step step : result)
         {
             step.claim(workerId,LEASE_DURATION);
         }
-        return steps;
+        return result;
     }
 }

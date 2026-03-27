@@ -81,4 +81,48 @@ public class StepRepositoryImpl implements StepRepositoryCustom {
                 .setParameter("batchSize", batchSize)
                 .getResultList();
     }
+     @Override
+     public List<Step> claimPending(int batchSize)
+     {
+         return entityManager.createNativeQuery("""
+            SELECT *
+            FROM steps
+            WHERE status = 'PENDING'
+            ORDER BY created_at
+            FOR UPDATE SKIP LOCKED
+            LIMIT :batchSize
+        """, Step.class)
+                 .setParameter("batchSize", batchSize)
+                 .getResultList();
+     }
+
+     @Override
+    public List<Step> claimRetryable(int batchSize)
+    {
+        return entityManager.createNativeQuery("""
+            SELECT *
+            FROM steps
+            WHERE (status = 'FAILED' AND next_retry_at <= now())
+            ORDER BY created_at
+            FOR UPDATE SKIP LOCKED
+            LIMIT :batchSize
+        """, Step.class)
+                .setParameter("batchSize", batchSize)
+                .getResultList();
+    }
+
+    @Override
+    public List<Step> claimExpired(int batchSize)
+    {
+        return entityManager.createNativeQuery("""
+            SELECT *
+            FROM steps
+            WHERE (status = 'RUNNING' AND lease_expires_at < now())
+            ORDER BY created_at
+            FOR UPDATE SKIP LOCKED
+            LIMIT :batchSize
+        """, Step.class)
+                .setParameter("batchSize", batchSize)
+                .getResultList();
+    }
 }

@@ -29,10 +29,7 @@ public class StepExecutionService {
     }
 
     @Transactional
-    public void markStepSuccess(UUID stepId) {
-
-        Step step = stepRepository.findById(stepId).orElseThrow();
-
+    public void markStepSuccess(Step step) {
         // idempotency safety
         if (step.getStatus() == StepStatus.SUCCESS) {
             return;
@@ -54,9 +51,7 @@ public class StepExecutionService {
     }
 
     @Transactional
-    public void markStepFailed(UUID stepId, String error) {
-
-        Step step = stepRepository.findById(stepId).orElseThrow();
+    public void markStepFailed(Step step, String error) {
         Workflow workflow = workflowRepository.findById(step.getWorkflowId()).orElseThrow();
         workflow.markRunningIfNotStarted();
 
