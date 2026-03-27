@@ -9,8 +9,9 @@ import com.rohan.workflow.workflow_engine.service.StepExecutionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.List;
-import java.util.Optional;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -18,14 +19,15 @@ public class ResultProcessingService {
 
     private final ExecutionResultRepositoryCustom resultRepository;
     private final ResultProcessorService resultProcessorService;
+    private final StepRepository stepRepository;
 
     public ResultProcessingService(
             ExecutionResultRepositoryCustom resultRepository,
-            StepRepository stepRepository,
-            StepExecutionService stepExecutionService, ResultProcessorService resultProcessorService) {
+            ResultProcessorService resultProcessorService, StepRepository stepRepository) {
 
         this.resultRepository = resultRepository;
         this.resultProcessorService = resultProcessorService;
+        this.stepRepository = stepRepository;
     }
 
     public void processBatch() throws InterruptedException {
@@ -38,8 +40,14 @@ public class ResultProcessingService {
         }
         log.info("Processing {} results " , results.size());
 
+        Map<UUID, Step> stepMap =
+                stepRepository.findAllByIdIn(
+                        results.stream().map(ExecutionResult::getStepId)
+                                .toList()
+                ).stream().collect(Collectors.toMap(Step::getId, s -> s));
+
         for (ExecutionResult result : results) {
-            resultProcessorService.processSingleResult(result);
+            resultProcessorService.processSingleResult(result, stepMap);
         }
     }
 }

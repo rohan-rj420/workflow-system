@@ -9,7 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -24,22 +26,19 @@ public class ResultProcessorService {
     }
 
     @Transactional
-    public void processSingleResult(ExecutionResult result)
+    public void processSingleResult(ExecutionResult result, Map<UUID, Step> stepMap)
     {
         log.debug("[STEP {} ] processing execution result", result.getStepId());
 
-        Optional<Step> stepOpt =
-                stepRepository.findById(result.getStepId());
+        Step step = stepMap.get(result.getStepId());
 
         // STEP ALREADY REMOVED (DLQ case)
-        if (stepOpt.isEmpty()) {
+        if (step==null) {
 
             log.warn("[STEP {}] no longer exists -skipping result", result.getStepId());
             result.markProcessed();
             return;
         }
-
-        Step step = stepOpt.get();
 
         // STEP ALREADY FINALIZED
         if (step.getStatus() == StepStatus.SUCCESS ||

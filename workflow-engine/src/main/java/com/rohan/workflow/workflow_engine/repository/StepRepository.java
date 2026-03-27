@@ -15,4 +15,6 @@ public interface StepRepository extends JpaRepository<Step, UUID>,StepRepository
     List<Step> findByWorkflowIdOrderByStepOrderAsc(UUID workflowId);
 
     long countByStatusAndLeaseExpiresAtBefore(StepStatus status, Instant now);
+
+    List<Step> findAllByIdIn(List<UUID> ids);
 }

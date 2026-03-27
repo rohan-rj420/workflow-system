@@ -23,6 +23,9 @@ public class OutboxDispatcherWorker {
 
     @PostConstruct
     public void start() {
+        //Start Dispatcher Workers first
+        dispatchService.startWorkers();
+        //Then start polling loop
         dispatcherExecutor.execute(this::runLoop);
     }
 
