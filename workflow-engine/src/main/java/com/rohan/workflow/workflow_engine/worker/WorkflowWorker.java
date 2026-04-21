@@ -59,17 +59,17 @@ public class WorkflowWorker {
 //    public void startWorker() {
 //             workerExecutor.execute(this::runWorkerLoop);
 //    }
-      @PostConstruct
-      public void startWorker() {
-
-              // 1 claimer thread
-              workerExecutor.execute(this::runClaimerLoop);
-
-              // multiple executor threads
-              for (int i = 0; i < 8; i++) {
-                    workerExecutor.execute(this::runExecutorLoop);
-              }
-      }
+//      @PostConstruct
+//      public void startWorker() {
+//
+//              // 1 claimer thread
+//              workerExecutor.execute(this::runClaimerLoop);
+//
+//              // multiple executor threads
+//              for (int i = 0; i < 8; i++) {
+//                    workerExecutor.execute(this::runExecutorLoop);
+//              }
+//      }
 
     private void runClaimerLoop() {
         while (true) {

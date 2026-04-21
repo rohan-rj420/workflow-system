@@ -17,10 +17,10 @@ public class ResultProcessorWorker {
         this.workerExecutor = workerExecutor;
     }
 
-    @PostConstruct
-    public void start() {
-        workerExecutor.execute(this::runLoop);
-    }
+//    @PostConstruct
+//    public void start() {
+//        workerExecutor.execute(this::runLoop);
+//    }
 
     private void runLoop() {
 
